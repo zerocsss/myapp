@@ -1,0 +1,20 @@
+{
+	"TITLE": "Covid-19 Tracking",
+  "CONFIRMED": "Confirmed",
+  "DEATHS": "Deaths",
+  "RECOVERED": "Recovered",
+  "INCREASED": "Increased",
+  "GOOD_BTN": "I'm good",
+  "UN_WELL_BTN": "Discomfort",
+	"NEAR_HEALTH": "Nearby health",
+	"NEAR_HEALTH_DEC": "No data nearby",
+  "NEAR_DEC": "Here shows the health status of other users within 10 km.",
+  "WELL": "I feel good today, submit tomorrow",
+  "UN_WELL": "I feel bad today, submit tomorrow",
+  "DATA_MADOL_TITLE": "Data sources",
+  "STATUS_TEXT_GOOD": "comfort",
+  "STATUS_TEXT_BAD": "Discomfort",
+	"DATA_FROM_DEC": "en-WHO, CDC, 1point3acres, Worldometers.info, state and national govenment health departments, and local media reports.",
+	"SHARE_DEC": "Share to help more person",
+	"DOWNLOAD_DEC": "Download MisstoryAPP"
+}

@@ -1,0 +1,20 @@
+{
+  "TITLE": "疫情动态追踪",
+  "CONFIRMED": "累计确诊",
+  "DEATHS": "累计死亡",
+  "RECOVERED": "累计治愈",
+  "INCREASED": "较昨日",
+  "GOOD_BTN": "感觉良好",
+  "UN_WELL_BTN": "有点不舒服",
+  "NEAR_HEALTH": "附近健康状况",
+  "NEAR_HEALTH_DEC": "附近暂无数据",
+  "NEAR_DEC": "此处展示附近10km内其他用户的健康状况。",
+  "WELL": "我今天感觉良好，请明天再来提交",
+  "UN_WELL": "我今天感觉不舒服，请明天再来提交",
+  "DATA_MADOL_TITLE": "数据来源",
+  "STATUS_TEXT_GOOD": "舒服",
+  "STATUS_TEXT_BAD": "不舒服",
+  "DATA_FROM_DEC": "zh-WHO，CDC，1point3acres，Worldometers.info，美国政府卫生部门以及当地媒体报道。",
+  "SHARE_DEC": "分享给好友，帮助大家共享健康信息",
+  "DOWNLOAD_DEC": "下载MisstoryAPP"
+}

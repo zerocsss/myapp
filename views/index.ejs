@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title><%= title %></title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="initial-scale=1">
+  <link rel='stylesheet' href='/stylesheets/style.css' />
+  <link rel='stylesheet' href='/stylesheets/mapbox-gl.css' />
+  <link rel="stylesheet" href="https://at.alicdn.com/t/font_1750351_i3azfe6zco.css">
+</head>
+
+<body>
+  <div id="map">
+    <div class="data-from-tip" onclick="openLayer()"><%= data_from_title %> <i class="iconfont iconwenhaotishi"></i></div>
+  </div>
+  <div class="tab">
+    <div class="tab_item"><%= confirmed %></div>
+    <div class="tab_item"><%= deaths %></div>
+    <div class="tab_item"><%= recovered %></div>
+  </div>
+
+  <!-- 数据 -->
+  <div class="num">
+    <div class="num_item">
+      <div class="num_item_top diagnosis">0</div>
+      <div class="num_item_bottom"><%= increased %><span class="diagnosis">+0</span></div>
+    </div>
+    <div class="num_item">
+      <div class="num_item_top death">0</div>
+      <div class="num_item_bottom"><%= increased %><span class="death">+0</span></div>
+    </div>
+    <div class="num_item">
+      <div class="num_item_top cure">0</div>
+      <div class="num_item_bottom"><%= increased %><span class="cure">+0</span></div>
+    </div>
+  </div>
+
+  <!-- 状态 -->
+  <div class="status">
+    <div class="btn good" onclick="postLocalStat('0')"><i class="iconfont iconxingzhuangjiehe"></i><%= good_btn %></div>
+    <div class="btn unwell" onclick="postLocalStat('1')"><i class="iconfont iconxingzhuangjiehe1"></i><%= un_well_btn %></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <span class="section-font"><%= near_health %></span>
+      <span class="section-good">
+        <i class="iconfont iconbianzu"></i>
+        <span class="good_num">0</span>
+      </span>
+      <span class="section-unwell">
+        <i class="iconfont iconku"></i>
+        <span class="bad_num">0</span>
+      </span>
+    </div>
+    <div class="section-dec"><%= near_dec %></div>
+  </div>
+
+  <!-- 列表区域 -->
+  <div class="list">
+    <div class="list-scroll"></div>
+    <div class="list-bottom"></div>
+  </div>
+
+  <div style="height: 0.65rem;"></div>
+
+  <!-- 底部悬浮按钮 -->
+  <div class="action">
+    <!-- <div class="action-wrap"></div> -->
+    <div class="action-btn"><i class="iconfont iconbianzu13 share"></i><%= share_dec%></div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-content">
+      <i class="iconfont iconbianzu14" onclick="closeLayer()"></i>
+      <div class="layer-content-title">
+        数据来源
+      </div>
+      <div class="layer-content-dec"><%= data_from_dec%></div>
+    </div>
+  </div>
+
+  <!-- <button onclick="openApp()">判断微信</button> -->
+  <script src='/javascripts/mapbox-gl.js'></script>
+  <script src="/javascripts/l7.js"></script>
+  <script src="javascripts/dayjs.min.js"></script>
+  <script src="/javascripts/rem.js"></script>
+  <script>
+    const useMapbox = true;
+    let scene, current_geo, currentZoom = 1;
+
+    saveCookie('sign_stat', '', -1)
+    /**
+     * sign_stat 控制按钮状态区域的显示 值为 good || bad
+     * 点击按钮保存在cookie 过期时间为1天
+    */
+    let status_area = document.querySelector('.status')
+    let sign_stat = getCookie('sign_stat')
+
+    if (sign_stat === 'good') {
+      status_area.innerHTML = '<div class="result-good fadein"><i class="iconfont iconxingzhuangjiehe"></i><%= well%></div>'
+    } else if (sign_stat === 'bad') {
+      status_area.innerHTML = '<div class="result-bad"><i class="iconfont iconxingzhuangjiehe1"></i><%= un_well%></div>'
+    }
+
+    // 操作cookie
+    function saveCookie(name, value, exdays) {
+      let cookie = `${name}=${value};`;
+      let d = new Date();
+      d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+      let expires = "expires=" + d.toGMTString();
+      document.cookie = cookie + expires + "; path=/"
+    }
+
+    function getCookie(name) {
+      const reg = new RegExp(`\\s*${name}=([^;]*)`)
+      const match = document.cookie.match(reg)
+      return match && match.length ? match[1] : undefined
+    }
+
+    // 数据来源弹层
+    function openLayer() {
+      let layer = document.querySelector('.layer');
+      layer.style.display = 'block';
+    }
+
+    function closeLayer() {
+      let layer = document.querySelector('.layer');
+      layer.style.display = 'none';
+    }
+
+    function isDarkMode() {
+      return (
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches
+      );
+    }
+
+    function initMap() {
+      if (useMapbox) {
+        mapboxgl.duration = 0.25;
+        mapboxgl.accessToken =
+          'pk.eyJ1IjoibHp4dWUiLCJhIjoiYnhfTURyRSJ9.Ugm314vAKPHBzcPmY1p4KQ';
+        map = new mapboxgl.Map({
+          container: 'map',
+          style: isDarkMode() ? 'mapbox://styles/misstory/ck7udrav70he91is6z3n1b64o' : 'mapbox://styles/mapbox/streets-v11',
+          center: [-96.475148, 39.715529],
+          zoom: currentZoom,
+          maxZoom: 10,
+          attributionControl: false
+        });
+        map.dragRotate.disable();
+        map.touchZoomRotate.disableRotation();
+
+        if ("geolocation" in navigator) {
+
+          const geolocate = new mapboxgl.GeolocateControl({
+            positionOptions: {
+              enableHighAccuracy: true
+            },
+            // trackUserLocation: true
+          })
+          map.addControl(geolocate, 'bottom-right');
+
+          var nav = new mapboxgl.NavigationControl({ showCompass: false });
+          map.addControl(nav, 'bottom-right');
+
+          geolocate.on('geolocate', function (data) {
+            const userlocation = data.coords;
+            const geo = `${userlocation.longitude},${userlocation.latitude}`;
+            getLocalStat(geo);
+          });
+
+          setTimeout(() => {
+            geolocate.trigger();
+          }, 1000);
+        } else {
+
+        }
+
+
+        scene = new L7.Scene({
+          id: 'map',
+          map: new L7.Mapbox({
+            mapInstance: map,
+          }),
+        });
+
+      } else {
+        map = new L7.GaodeMap({
+          logoVisible: false,
+          rotateEnable: false,
+          container: 'map',
+          // style: 'light', // 样式URL
+          center: [-96.475148, 39.715529],
+          pitch: 0,
+          zoom: 2,
+          maxZoom: 9,
+
+        });
+        scene = new L7.Scene({
+          id: 'map',
+          map: map,
+        });
+      }
+
+      scene.on('loaded', () => {
+        console.log('Scene loaded');
+        reload();
+        getLocalStat()
+      });
+    }
+
+    function postLocalStat(stat) {
+
+      let formData = new FormData();
+
+      formData.append('stat', stat);
+      formData.append('geo', current_geo);
+
+      let good = document.querySelector('.good')
+      let bad = document.querySelector('.unwell')
+      if (stat === '0') {
+        good.classList.add('fadeout')
+        saveCookie('sign_stat', 'good', 1)
+        setTimeout(function () {
+          status_area.innerHTML = '<div class="result-good fadein"><i class="iconfont iconxingzhuangjiehe"></i><%= well%></div>'
+        }, 500)
+      } else {
+        bad.classList.add('fadeout')
+        saveCookie('sign_stat', 'bad', 1)
+        setTimeout(function () {
+          status_area.innerHTML = '<div class="result-bad"><i class="iconfont iconxingzhuangjiehe1"></i><%= un_well%></div>'
+        }, 500)
+      }
+
+      fetch('https://misstory.lileino9.top/api/js/Covid/stat', {
+        method: 'POST',
+        headers: new Headers({
+          'AppToken': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6MTB9.eyJjbGllbnRfc24iOiIxMSIsInVzZXJfaWQiOjAsImV4cCI6MTU4ODkwNjE2OCwia2lkIjoxMCwiZXh0X2RhdGEiOnsiaXNfY2hpbmEiOjAsImFwaUdhdGVLZXkiOiIyMDAxIn0sInRva2VuX3NpZ24iOiIyN2U1OTg4OWM5OTJmMGE0MDdiZmI2NTc0NzY4NGNlMDIyYWQ4ODA1ODg5NzJmNmU0MWMzZTdlNWQ2YTA5ZTYwIn0.OHzBSC9NMiaTBXSHLumLxetd8MQAiAIZ-3AapxyH1bA'
+        }),
+        body: formData
+      })
+        .then(response => response.json())
+        .then(response => console.log('Success:', JSON.stringify(response)))
+        .catch(error => console.error('Error:', error));
+    }
+
+    function getLocalStat(geo) {
+      geo = geo || '-96.475148,39.715529';
+      current_geo = geo
+      fetch(`https://misstory.lileino9.top/api/js/Covid/stat?geo=${geo}&distance=10`, {
+        headers: new Headers({
+          'Content-Type': 'application/json',
+          'AppToken': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6MTB9.eyJjbGllbnRfc24iOiIxMSIsInVzZXJfaWQiOjAsImV4cCI6MTU4ODkwNjE2OCwia2lkIjoxMCwiZXh0X2RhdGEiOnsiaXNfY2hpbmEiOjAsImFwaUdhdGVLZXkiOiIyMDAxIn0sInRva2VuX3NpZ24iOiIyN2U1OTg4OWM5OTJmMGE0MDdiZmI2NTc0NzY4NGNlMDIyYWQ4ODA1ODg5NzJmNmU0MWMzZTdlNWQ2YTA5ZTYwIn0.OHzBSC9NMiaTBXSHLumLxetd8MQAiAIZ-3AapxyH1bA'
+        })
+      }).then(resp => resp.json())
+        .then(json => {
+          const data = json.data;
+          let tmp = document.querySelector('.list-scroll')
+          let good_num = 0, bad_num = 0;
+          html = ''
+          if (data.features.length > 0) {
+            data.features.forEach(element => {
+            if (element.properties.Stat) {
+              bad_num = bad_num + 1
+            } else {
+              good_num = good_num + 1
+            }
+            let status = element.properties.Stat ? '<%= status_text_bad%>' : '<%= status_text_good%>'
+            let status_class = element.properties.Stat ? 'status-unwell' : 'status-good' 
+            let icon = element.properties.Stat ? 'iconxingzhuang' : 'iconbianzu' 
+            html += "<div class='list-item'>"
+            html += "<div class='icon'>"
+            html += "<i class='iconfont " + icon + "'></i>"
+            html += "</div>"
+            html += "<div class='line'></div>"
+            html += "<div class='" + status_class + "'>" + status + "</div>"
+            html += "<div class='time'>" + dayjs(element.properties.Last_Update).format('YYYY/MM/DD HH:mm') + "</div>"
+            html += "<div class='space'>" + element.properties.Distance + element.properties.Distance_Unit + "</div>"
+            html += "</div>"
+          });
+          html += "<div class='list-bottom'></div>"
+          } else {
+            html += "<div class='list-null-bg'><div class='list-null-font'><%= near_health_dec%></div></div>"
+          }
+          tmp.innerHTML = html
+          console.log('======', good_num, bad_num)
+          document.querySelector('.good_num').innerHTML = good_num;
+          document.querySelector('.bad_num').innerHTML = bad_num;
+
+          let userLayer = new L7.PointLayer({})
+            .shape('circle')
+            .size(3)
+            .source(data)
+            .color('blue')
+            .style({
+              opacity: 0.8,
+              strokeWidth: 0.1
+            });
+          scene.addLayer(userLayer);
+        });
+    }
+
+    function prepareData(data, simple) {
+      if (simple) {
+        const d2 = {
+          type: "FeatureCollection",
+          features: []
+        }
+        data.features.map(item => {
+          if (item.properties.Confirmed > 30) {
+            d2.features.push(item);
+          }
+        });
+        return d2;
+      }
+      return data;
+    }
+
+    function reload() {
+
+      let statLayer, pointLayer;
+      fetch('https://opendata.arcgis.com/datasets/628578697fb24d8ea4c32fa0c5ae1843_0.geojson')
+        .then(resp => resp.json())
+        .then(data => {
+          let totalConfirmed = 0, totalRecovered = 0, totalDeaths = 0;
+
+          let states = {};
+          data.features.map(item => {
+            if (item.properties) {
+              if (states[item.properties.Province_State]) {
+                states[item.properties.Province_State] += item.properties.Confirmed;
+              } else {
+                states[item.properties.Province_State] = item.properties.Confirmed;
+              }
+              totalConfirmed += item.properties.Confirmed;
+              totalRecovered += item.properties.Recovered;
+              totalDeaths += item.properties.Deaths;
+            }
+          });
+
+          console.log('===', totalConfirmed, totalRecovered, totalDeaths)
+          document.querySelector('.diagnosis').innerHTML = totalConfirmed;
+          document.querySelector('.death').innerHTML = totalDeaths;
+          document.querySelector('.cure').innerHTML = totalRecovered;
+
+          pointLayer = new L7.PointLayer({})
+            .shape('circle')
+            .source(prepareData(data, true), {
+              // cluster: true,
+              field: 'Confirmed',
+              clusterOption: {
+                radius: 10,
+                maxZoom: 9,
+                minZoom: 3
+              }
+            })
+            .size('Confirmed', (c) => {
+              // console.log(c);
+              if (c > 10000) return 25;
+              if (c > 1000) return 12;
+              if (c > 100) return 6;
+
+              return Math.max(c / 10, 1);
+            })
+            // .scale('Confirmed', {
+            //   type: 'quantile'
+            // })
+            // .scale('point_count', {
+            //   type: 'quantile'
+            // })
+            // .size('point_count', [2, 5, 10, 15, 20, 25])
+            .color('#8D000F')
+            .style({
+              opacity: 1,
+              // strokeWidth: 0.01
+            });
+          // pointLayer.hide();
+          scene.addLayer(pointLayer);
+
+          scene.on('zoomend', () => {
+            const z = scene.getZoom();
+
+
+            // if (z >= 5) {
+            //   pointLayer.show();
+            //   statLayer.hide();
+            // } else {
+            //   statLayer.show();
+            //   pointLayer.hide();
+            // }
+            setTimeout(() => {
+              if (currentZoom < z) {
+                if (currentZoom < 4 && z >= 4) {
+                  console.log(z, 'zoomIn');
+                  // pointLayer.animate(true);
+                  pointLayer.setData(prepareData(data, false));
+                  scene.render();
+                }
+              } else {
+                if (currentZoom >= 4 && z < 4) {
+                  console.log(z, 'zoomOut');
+                  // pointLayer.animate(false);
+                  pointLayer.setData(prepareData(data, true));
+                  scene.render();
+                }
+              }
+              currentZoom = z;
+            }, 10);
+
+          }); // 缩放停止时触发
+
+          return fetch('https://gw.alipayobjects.com/os/basement_prod/d36ad90e-3902-4742-b8a2-d93f7e5dafa2.json')
+            .then(resp2 => resp2.json()).then(data2 => {
+              const color = ['#FFEAA0', '#F8A683', '#FF716A', '#FF4F5B', '#FF1F45', '#F70034', '#DA0028', '#AF001B', '#8D000F', '#700000'];
+              data2.features.map(item => {
+                item.properties.Confirmed = states[item.properties.name];
+                delete item.properties['density']
+              });
+
+              statLayer = new L7.PolygonLayer({})
+                .source(data2)
+                .color(
+                  'Confirmed', d => {
+                    // const d = c / totalConfirmed;
+                    return d > 100000 ? color[9] :
+                      d > 60000 ? color[8] :
+                        d > 40000 ? color[7] :
+                          d > 15000 ? color[6] :
+                            d > 12000 ? color[5] :
+                              d > 5000 ? color[4] :
+                                d > 2000 ? color[3] :
+                                  d > 800 ? color[2] :
+                                    d > 300 ? color[1] :
+                                      color[0];
+                  }
+                )
+                .shape('fill')
+                .active(true)
+                .style({
+                  opacity: 1.0
+                });
+
+              // statLayer.on('click', e => {
+              //   // const popup = new L7.Popup({
+              //   //   offsets: [0, 0],
+              //   //   closeButton: false
+              //   // })
+              //   //   .setLnglat(e.lngLat)
+              //   //   .setHTML(`<span>${e.feature.properties.name}: ${e.feature.properties.Confirmed}</span>`);
+              //   // scene.addPopup(popup);
+              //   const coors = e.feature.geometry.coordinates[0];
+              //   function getCenterPoint(path) {
+              //     //var path =e.;//Array<Point> 返回多边型的点数组
+              //     //var ret=parseFloat(num1)+parseFloat(num2);
+              //     var x = 0.0;
+              //     var y = 0.0;
+              //     for (var i = 0; i < path.length; i++) {
+              //       // console.log(path[i][0]);
+
+              //       x = x + parseFloat(path[i])[0];
+              //       y = y + parseFloat(path[i])[1];
+              //     }
+              //     x = x / path.length;
+              //     y = y / path.length;
+
+              //     //return new BMap.Point(path[0].lng,path[0].lat);
+              //     return [x, y];
+              //     //return path[0];
+              //   }
+
+              //   const p = getCenterPoint(coors);
+              //   console.log(coors, p);
+
+              //   scene.setZoomAndCenter(5, p);
+              //   // scene.fitBounds([minLon, minLat, maxLon, maxLat]);
+              // });
+
+              scene.addLayer(statLayer);
+
+            })
+        });
+    }
+
+    function getColorByBaiFenBi(bili) {
+      //var 百分之一 = (单色值范围) / 50;  单颜色的变化范围只在50%之内
+      var one = (255 + 255) / 100;
+      var r = 0;
+      var g = 0;
+      var b = 0;
+
+      if (bili < 50) {
+        // 比例小于50的时候红色是越来越多的,直到红色为255时(红+绿)变为黄色.
+        r = one * bili;
+        g = 255;
+      }
+      if (bili >= 50) {
+        // 比例大于50的时候绿色是越来越少的,直到0 变为纯红
+        g = 255 - ((bili - 50) * one);
+        r = 255;
+      }
+      r = parseInt(r);// 取整
+      g = parseInt(g);// 取整
+      b = parseInt(b);// 取整
+
+      //console.log("#"+r.toString(16,2)+g.toString(16,2)+b.toString(16,2));
+      // return "#" + r.toString(16, 2) + g.toString(16, 2) + b.toString(16, 2);
+      //console.log("rgb("+r+","+g+","+b+")" );
+      return "rgb(" + r + "," + g + "," + b + ")";
+
+    }
+
+    // 判断是否安装应用
+    function openApp() {
+      if (navigator.userAgent.match(/(iPhone|iPod|iPad);?/i)) {
+        var loadDateTime = new Date();
+        window.setTimeout(function () {
+          var timeOutDateTime = new Date();
+          if (timeOutDateTime - loadDateTime < 5000) {
+            window.location = "要跳转的下载app页面URL";
+          } else {
+            window.close();
+          }
+        }, 25);
+        window.location = "weixin://";
+      } else if (navigator.userAgent.match(/android/i)) {
+        var loadDateTime = new Date();
+        var state = window.open("weixin://", '_blank');
+        window.setTimeout(function () {
+          var timeOutDateTime = new Date();
+          if (timeOutDateTime - loadDateTime < 5000) {
+            window.location = "要跳转的下载app页面URL";
+          } else {
+            window.close();
+          }
+        }, 25);
+      }
+    }
+
+    initMap();
+  </script>
+</body>
+
+</html>
